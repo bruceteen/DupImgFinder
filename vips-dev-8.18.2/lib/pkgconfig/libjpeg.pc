@@ -1,0 +1,10 @@
+prefix=/usr/local/mxe/usr/x86_64-w64-mingw32.static
+exec_prefix=/usr/local/mxe/usr/x86_64-w64-mingw32.static
+libdir=/usr/local/mxe/usr/x86_64-w64-mingw32.static/lib
+includedir=/usr/local/mxe/usr/x86_64-w64-mingw32.static/include
+
+Name: libjpeg
+Description: A SIMD-accelerated JPEG codec that provides the libjpeg API
+Version: 5.0.0
+Libs: -L${libdir} -ljpeg
+Cflags: -I${includedir}

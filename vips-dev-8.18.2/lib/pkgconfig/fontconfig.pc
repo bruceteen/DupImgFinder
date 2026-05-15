@@ -1,0 +1,15 @@
+prefix=/usr/local/mxe/usr/x86_64-w64-mingw32.static
+includedir=${prefix}/include
+libdir=${prefix}/lib
+
+sysconfdir=/usr/local/mxe/usr/x86_64-w64-mingw32.static/etc
+localstatedir=/usr/local/mxe/usr/x86_64-w64-mingw32.static/var
+confdir=/usr/local/mxe/usr/x86_64-w64-mingw32.static/etc/fonts
+cachedir=LOCAL_APPDATA_FONTCONFIG_CACHE
+
+Name: Fontconfig
+Description: Font configuration and customization library
+Version: 2.17.1
+Requires: freetype2 >=  21.0.15, expat
+Libs: -L${libdir} -lfontconfig -lm
+Cflags: -I${includedir}
