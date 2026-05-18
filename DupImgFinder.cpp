@@ -142,6 +142,14 @@ BOOL CDupImgFinderApp::InitInstance()
     // you may call VIPS_INIT() many times and vips_shutdown() many times, but you must not call VIPS_INIT() after vips_shutdown(). In other words, you cannot stop and restart libvips.
     vips_shutdown();
 
+#ifdef _MSC_VER // 否则一切涉及到 tzdb 的都会看起来内存泄漏，比如 std::chrono::current_zone()
+    if( auto p=std::chrono::_Global_tzdb_list.exchange(nullptr); p )
+    {
+        std::destroy_at( p );
+        ::__std_free_crt( p );
+    }
+#endif
+
     // 由于对话框已关闭，所以将返回 FALSE 以便退出应用程序，
 	//  而不是启动应用程序的消息泵。
 	return FALSE;

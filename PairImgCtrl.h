@@ -26,11 +26,10 @@ public:
         std::wstring imgfmt;
         int width, height;
         uintmax_t filesize;
-        std::tm lastwritetime;
+        std::wstring lastwritetime;
 
         CRect rect;
         CRect rect_img;
-        std::wstring lastwritetime_s;
     };
     std::unique_ptr<Gdiplus::Bitmap> Load_Image( const std::filesystem::path& imgpath, std::vector<BYTE>& buffer, ImageInfo& info ) const;
     virtual void DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct ) override;

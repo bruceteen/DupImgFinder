@@ -8,6 +8,10 @@
 
 #include "vips/vips.h"
 
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
 // CPairImgCtrl
 
 IMPLEMENT_DYNAMIC(CPairImgCtrl, CStatic)
@@ -119,33 +123,15 @@ std::unique_ptr<Gdiplus::Bitmap> CPairImgCtrl::Load_Image( const std::filesystem
         return nullptr;
 
     std::error_code ec;
-    auto ftime = std::filesystem::last_write_time(imgpath,ec);
-     
-    //auto sys_time = std::chrono::clock_cast<std::chrono::system_clock>(ftime); // 看起来有内存泄漏
-    //auto sys_time_seconds = std::chrono::round<std::chrono::seconds>(sys_time);
-    //auto local_time = std::chrono::zoned_time{ std::chrono::current_zone(), sys_time_seconds };
-
-    //auto utc_time = std::chrono::file_clock::to_utc(ftime);
-    //auto local_tp = std::chrono::zoned_time{ std::chrono::current_zone(), utc_time }; 编译失败
-
-    //auto utc_time = std::chrono::file_clock::to_utc(ftime);
-    //using Converter = std::chrono::clock_time_conversion<std::chrono::system_clock, std::chrono::utc_clock>;
-    //auto sys_now = Converter{}(utc_time); // 看起来有内存泄漏
-    //std::chrono::zoned_time zt{std::chrono::current_zone(), sys_now};
-
-    auto time_since_epoch = std::chrono::time_point_cast<std::chrono::seconds>(ftime).time_since_epoch();
-    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
-    std::time_t tt = static_cast<std::time_t>(seconds - 11644473600LL);
-    std::tm tm_local = {};
-    localtime_s( &tm_local, &tt );
+    auto file_time = std::filesystem::last_write_time(imgpath,ec);
+    auto sys_time = std::chrono::clock_cast<std::chrono::system_clock>(file_time);
+    auto sys_time_seconds = std::chrono::round<std::chrono::seconds>(sys_time);
+    auto local_time = std::chrono::zoned_time{ std::chrono::current_zone(), sys_time_seconds };
 
     info.width = width;
     info.height = height;
     info.filesize = std::filesystem::file_size(imgpath,ec);
-    info.lastwritetime = tm_local;
-    info.lastwritetime_s = std::format( L"{:04}-{:02}-{:02} {:02}:{:02}:{:02}"
-                , 1900+tm_local.tm_year, 1+tm_local.tm_mon, tm_local.tm_mday
-                , tm_local.tm_hour, tm_local.tm_min, tm_local.tm_sec );
+    info.lastwritetime = std::format( L"{:%Y-%m-%d %H:%M:%S}", local_time );
     return pBitmap;
 }
 
@@ -262,7 +248,7 @@ void CPairImgCtrl::DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct )
                 std::wstring b = std::format( L"{}x{}  ", hs_info.width, hs_info.height );
                 int bw = dc.GetTextExtent(b.c_str()).cx;
                 std::wstring c = std::format( L"{}KB", std::ceil(hs_info.filesize/1024.0) );
-                std::wstring d = hs_info.lastwritetime_s;
+                std::wstring d = hs_info.lastwritetime;
                 int tw = (std::max)( dc.GetTextExtent((a+b+c).c_str()).cx, dc.GetTextExtent(d.c_str()).cx );
                 int s = tw<hs_info.rect.Width() ? (hs_info.rect.Width()-tw)/2 : 0;
 	            s += hs_info.rect.left;

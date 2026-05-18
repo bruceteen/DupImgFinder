@@ -24,6 +24,10 @@
 #include "vips/vips.h"
 #pragma comment( lib, "vips-dev-8.18.2/lib/libvips.lib" )
 
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
 template <class T>
 static std::wstring convert_to_wstring( const T& src )
 {

@@ -7,6 +7,10 @@
 #include "ImageShowDlg.h"
 #include <cmath>
 
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
 // CImageShowDlg 对话框
 
 IMPLEMENT_DYNAMIC(CImageShowDlg, CDialogEx)

@@ -1,6 +1,10 @@
 ﻿#include <cmath>
 #include <numbers>
 
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
 class DCTProcessor
 {
 private:

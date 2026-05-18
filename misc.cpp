@@ -6,6 +6,10 @@
 #include <algorithm>
 #include <cwctype>
 
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
 namespace misc
 {
     std::wstring get_process_path()

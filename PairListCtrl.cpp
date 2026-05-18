@@ -9,6 +9,10 @@
 #include <memory>
 #include "misc.h"
 
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
 IMPLEMENT_DYNAMIC(CPairListCtrl, CListCtrl)
 
 CPairListCtrl::CPairListCtrl( CPairImgCtrl& m_PairImg, bool OnlyFileName ) : m_OnlyFileName(OnlyFileName), m_PairImg(m_PairImg)
