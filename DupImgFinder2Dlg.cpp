@@ -6,6 +6,10 @@
 #include "afxdialogex.h"
 #include "DupImgFinder2Dlg.h"
 
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
 // CDupImgFinder2Dlg 对话框
 
 CSize CDupImgFinder2Dlg::m_csLastWin_sz = { 0, 0 };

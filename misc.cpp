@@ -6,6 +6,10 @@
 #include <algorithm>
 #include <cwctype>
 
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
 namespace misc
 {
     std::wstring get_process_path()
@@ -138,10 +142,32 @@ namespace misc
         return {};
     }
 
+    std::u8string to_lower( std::u8string_view s )
+    {
+        //std::ranges::transform( s, s.begin(), [](char8_t ch){return (char8_t)std::tolower(ch);} );
+        std::u8string result( s );
+        for( char8_t& ch : result )
+        {
+            if( ch>=u8'A' && ch <=u8'Z' )
+                ch += (u8'a' - u8'A');
+        }
+        return result;
+    }
+    std::wstring to_lower( std::wstring_view s )
+    {
+        //std::ranges::transform( s, s.begin(), [](wchar_t ch){return (wchar_t)std::towlower(ch);} );
+        std::wstring result( s );
+        for( wchar_t& ch : result )
+        {
+            if( ch>=L'A' && ch <=L'Z' )
+                ch += (L'a' - L'A');
+        }
+        return result;
+    }
+
     std::wstring lexically_normal_tolower( const std::filesystem::path& path )
     {
-        auto s = path.lexically_normal().wstring();
-        std::ranges::transform( s, s.begin(), [](wchar_t c){return std::towlower(c);} );
+        auto s = to_lower( path.lexically_normal().wstring() );
         return s;
     }
     bool is_path_containing( const wchar_t* a, const wchar_t* b )

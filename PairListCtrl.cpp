@@ -9,6 +9,10 @@
 #include <memory>
 #include "misc.h"
 
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
 IMPLEMENT_DYNAMIC(CPairListCtrl, CListCtrl)
 
 CPairListCtrl::CPairListCtrl( CPairImgCtrl& m_PairImg, bool OnlyFileName ) : m_OnlyFileName(OnlyFileName), m_PairImg(m_PairImg)
@@ -536,9 +540,9 @@ void CPairListCtrl::SaveState()
         std::get<5>(m_pair[nItem]) = LVIS_SELECTED;
     for( int nItem=-1; nItem=GetNextItem(nItem,LVNI_FOCUSED), nItem!=-1; )
         std::get<5>(m_pair[nItem]) |= LVIS_FOCUSED;
-    size_t iTop = std::ranges::clamp( (size_t)GetTopIndex(), 0zu, m_pair.size() );
-    size_t iBottom = std::ranges::clamp( (size_t)(GetTopIndex()+GetCountPerPage()), 0zu, m_pair.size() );
-    for( size_t nItem=iTop; nItem!=iBottom; ++nItem )
+
+    size_t iTop = (size_t)GetTopIndex();
+    for( size_t nItem=0; nItem!=iTop; ++nItem )
         std::get<5>(m_pair[nItem]) |= LVIS_CUT;
 
     SetItemState( -1, 0, LVIS_FOCUSED|LVIS_SELECTED );
@@ -551,8 +555,7 @@ void CPairListCtrl::RestorState()
 
     SetItemCount( (int)m_pair.size() );
 
-    size_t iTop = m_pair.size();
-    size_t iBottom = 0;
+    size_t iTop = size_t(-1);
     for( size_t nItem=0; nItem!=m_pair.size(); ++nItem )
     {
         auto& state = std::get<5>(m_pair[nItem]);
@@ -560,14 +563,12 @@ void CPairListCtrl::RestorState()
         if( state_sf != 0 )
             SetItemState( (int)nItem, state_sf, LVIS_FOCUSED|LVIS_SELECTED ); // 可能引发 OnLvnItemchanged，最终导致 m_raw/m_pair 被修改
         if( (state & LVIS_CUT) != 0 )
-        {
-            iTop = (std::min)( iTop, nItem );
-            iBottom = (std::max)( iBottom, nItem );
-        }
+            iTop = nItem;
+
         state = 0;
     }
-    if( iBottom < m_pair.size() )
-        EnsureVisible( (int)iBottom, FALSE );
+
+    iTop += 1;
     if( iTop < m_pair.size() )
         EnsureVisible( (int)iTop, FALSE );
 

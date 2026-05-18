@@ -20,9 +20,14 @@
 #include <ranges>
 #include <chrono>
 #include <thread>
+#include <fstream>
 
 #include "vips/vips.h"
 #pragma comment( lib, "vips-dev-8.18.2/lib/libvips.lib" )
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
 
 template <class T>
 static std::wstring convert_to_wstring( const T& src )
@@ -76,19 +81,39 @@ static std::vector<std::u8string> collect_load_formats()
     return s;
 }
 
-static std::optional<uint64_t> process_single_image( const char8_t* path, std::u8string& img_fmt )
+static std::optional<uint64_t> process_single_image( const std::filesystem::path& path, std::u8string& img_fmt )
 {
     vips_error_clear();
     img_fmt.clear();
 
     // 生成彩色缩略图
     VipsImage* thumb = nullptr;
-    if( vips_thumbnail((const char*)path, &thumb, 32, "height", 32
+    if( vips_thumbnail((const char*)path.u8string().c_str(), &thumb, 32, "height", 32
         , "crop", VIPS_INTERESTING_CENTRE
         , nullptr) )
     {
         [[maybe_unused]] const char* error_msg = vips_error_buffer();
         vips_error_clear();
+        //if constexpr( true )
+        //{
+        //    if( misc::to_lower(path.extension().u8string()) == u8".jpg" )
+        //    {
+        //        if( std::ifstream raw(path,std::ios::binary); raw )
+        //        {
+        //            if( char bom[3]; raw.read(bom,std::size(bom)) && raw.gcount()==std::size(bom)
+        //                && bom[0]=='\xEF' && bom[1]=='\xBB' && bom[2]=='\xBF' )
+        //            {
+        //                std::vector<char> buffer( (std::istreambuf_iterator<char>(raw)), std::istreambuf_iterator<char>() );
+        //                raw.close();
+        //                
+        //                if( std::ofstream out(path,std::ios::binary); out )
+        //                {
+        //                     out.write( buffer.data(), buffer.size() );
+        //                }
+        //            }
+        //        }
+        //    }
+        //}
         return {};
     }
 
@@ -126,22 +151,39 @@ static std::optional<uint64_t> process_single_image( const char8_t* path, std::u
         gray = tmp;
     }
 
-    // 确保图像是内存中的连续块
-    size_t mem_size = 0;
-    void* mem_buf = vips_image_write_to_memory( gray, &mem_size );
-    if( !mem_buf || mem_size!=32*32 )
+    //// 确保图像是内存中的连续块
+    //size_t mem_size = 0;
+    //void* mem_buf = vips_image_write_to_memory( gray, &mem_size );
+    //if( !mem_buf || mem_size!=32*32 )
+    //{
+    //    if( mem_buf )
+    //        g_free(mem_buf);
+    //    g_object_unref( gray );
+    //    return {};
+    //}
+    // extern uint64_t calculate_phash_32x32_fast( const unsigned char data[1024] );
+    // uint64_t pHash = calculate_phash_32x32_fast( (const unsigned char*)mem_buf );
+    // g_free( mem_buf );
+
+    // 零拷贝路径：确保数据在内存且连续
+    if( vips_image_wio_input(gray) != 0 )
     {
-        if( mem_buf )
-            g_free(mem_buf);
-        g_object_unref( gray );
+        g_object_unref(gray);
         return {};
     }
+    // 验证尺寸
+    if( gray->Xsize!=32 || gray->Ysize!=32 || gray->Bands!=1)
+    {
+        g_object_unref(gray);
+        return {};
+    }
+    // 直接访问底层数据
+    unsigned char* data = (unsigned char*)VIPS_IMAGE_ADDR(gray, 0, 0);
 
     // 计算 pHash
-    uint64_t calculate_phash_32x32_fast( const unsigned char data[1024] );
-    uint64_t pHash = calculate_phash_32x32_fast( (const unsigned char*)mem_buf );
-
-    g_free( mem_buf );
+    extern uint64_t calculate_phash_32x32_fast( const unsigned char data[1024] );
+    uint64_t pHash = calculate_phash_32x32_fast(data);
+        
     g_object_unref(gray);
     return pHash;
 }
@@ -181,13 +223,12 @@ GetAllPHash( std::stop_token& stopToken
                 {
                     sub_folders.push_back( entry.path().wstring() );
                 }
-                else if( entry.is_regular_file() )
+                else if( entry.is_regular_file() && entry.path().filename()!=L".nomedia" )
                 {
                     ++num_files;
                     std::u8string img_fmt;
-                    auto pHash = process_single_image( entry.path().u8string().c_str(), img_fmt );
-                    auto ext = entry.path().extension().u8string();
-                    std::ranges::transform( ext, ext.begin(), [](char8_t ch){return (char8_t)std::tolower(ch);} );
+                    auto pHash = process_single_image( entry.path(), img_fmt );
+                    auto ext = misc::to_lower( entry.path().extension().u8string() );
                     if( pHash.has_value() )
                     {
                         ++num_images;
@@ -196,7 +237,7 @@ GetAllPHash( std::stop_token& stopToken
                             q.insert( {ext, entry.path().wstring()} );
                         tmp.emplace_back( entry.path().filename().wstring(), pHash.value() );
                     }
-                    else if( entry.path().filename() != L".nomedia" )
+                    else // if( entry.path().filename() != L".nomedia" )
                     {
                         if( !failed_extnames.contains(ext) )
                             failed_extnames.insert( {ext, entry.path().wstring()} );

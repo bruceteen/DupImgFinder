@@ -14,6 +14,9 @@ namespace misc
 
     CString ShowFolderBrowserDialog( HWND hwndOwner, LPCWSTR title=nullptr, LPCWSTR initial_path=nullptr );
 
+    std::u8string to_lower( std::u8string_view s );
+    std::wstring to_lower( std::wstring_view s );
+
     std::wstring lexically_normal_tolower( const std::filesystem::path& path );
 
     bool is_path_containing( const wchar_t* a, const wchar_t* b );
