@@ -38,33 +38,28 @@ void CPairListCtrl::PreSubclassWindow()
 {
     ASSERT( (GetStyle() & LVS_OWNERDATA) != 0 ); // LVS_OWNERDATA必须提前设
 
-    {
-        CRect rect;
-        GetWindowRect( &rect );
-        min_window_cx = rect.Width();
-        last_window_cx = min_window_cx;
-        GetClientRect( &rect );
-        min_client_cx = rect.Width();
-    }
-
     // 在子类化之前设置自绘样式
     if( m_OnlyFileName )
         ModifyStyle(0, LVS_REPORT&~LVS_OWNERDRAWFIXED);
     else
         ModifyStyle(0, LVS_REPORT|LVS_OWNERDRAWFIXED);
     SetExtendedStyle( GetExtendedStyle() | LVS_EX_LABELTIP );
-    SetExtendedStyle( GetExtendedStyle() | LVS_EX_AUTOSIZECOLUMNS );
+    //SetExtendedStyle( GetExtendedStyle() | LVS_EX_AUTOSIZECOLUMNS );
     SetExtendedStyle( GetExtendedStyle() | LVS_EX_FULLROWSELECT );
     CListCtrl::PreSubclassWindow();
 
     InsertColumn( 0, _T("原始项"), LVCFMT_LEFT );
-    InsertColumn( 1, _T("相似度"), LVCFMT_RIGHT );
+    InsertColumn( 1, _T("相似度"), LVCFMT_RIGHT ); // 靠右
     InsertColumn( 2, _T("重复项"), LVCFMT_LEFT );
     
+    CRect rect;
+    GetClientRect( &rect );
+    last_client_cx = rect.Width() - ::GetSystemMetrics(SM_CXVSCROLL);
+
     SetColumnWidth( 1, LVSCW_AUTOSIZE_USEHEADER );
-    int w1 = GetColumnWidth(1)+1;
-    int w0 = max( min_header_width, (min_client_cx-w1)/2 );
-    int w2 = max( min_header_width, (min_client_cx-w1-w0) );
+    int w1 = GetColumnWidth(1);
+    int w0 = (last_client_cx-w1)/2;
+    int w2 = (last_client_cx-w1-w0);
     SetColumnWidth( 0, w0 );
     SetColumnWidth( 1, w1 );
     SetColumnWidth( 2, w2 );
@@ -122,7 +117,7 @@ void CPairListCtrl::DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct ) // 仅当 m_On
     dc.Attach( lpDrawItemStruct->hDC );
     dc.FillSolidRect( &rect, bkColor );
 
-    auto draw_single_item = [&dc,textColor]( CRect textRect, std::wstring_view s1, std::wstring_view s2, std::wstring_view s3 )
+    auto draw_single_item = [&dc,textColor]( CRect textRect, std::wstring_view s1, std::wstring_view s2, std::wstring_view s3, bool 靠右=false )
         {
             textRect.DeflateRect(2, 0);
             int nSavedDC = dc.SaveDC();
@@ -144,7 +139,7 @@ void CPairListCtrl::DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct ) // 仅当 m_On
             if( textRect.Width()>0 && !s3.empty() )
             {
                 dc.SetTextColor(textColor);
-                dc.DrawText( s3.data(), (int)s3.size(), textRect, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX );
+                dc.DrawText( s3.data(), (int)s3.size(), textRect, (靠右 ? DT_RIGHT:DT_LEFT)|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX );
                 textRect.left += dc.GetTextExtent( s3.data(), (int)s3.size() ).cx;
             }
 
@@ -156,7 +151,7 @@ void CPairListCtrl::DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct ) // 仅当 m_On
     draw_single_item( rect_lhs, common, lhs_pr, GetItem_lhs(row,true) );
 
     CRect rect_mhs( rect_lhs.right, rect.top, rect_lhs.right + GetColumnWidth(1), rect.bottom );
-    draw_single_item( rect_mhs, {}, {}, GetItem_mhs(row) );
+    draw_single_item( rect_mhs, {}, {}, GetItem_mhs(row), true );
 
     CRect rect_rhs( rect_mhs.right, rect.top, rect_mhs.right + GetColumnWidth(2), rect.bottom );
     draw_single_item( rect_rhs, common, rhs_pr, GetItem_rhs(row,true) );
@@ -261,7 +256,72 @@ void CPairListCtrl::OnLvnItemchanged( NMHDR* pNMHDR, LRESULT* pResult )
 void CPairListCtrl::OnSize( UINT nType, int cx, int cy ) // 先放大后缩小有问题，因为滚动条
 {
     CListCtrl::OnSize( nType, cx, cy );
-    return; // 太难了，如果要继续，请去掉上面的 SetExtendedStyle( GetExtendedStyle() | LVS_EX_AUTOSIZECOLUMNS );
+    //return; // 太难了，如果要继续，请去掉上面的 SetExtendedStyle( GetExtendedStyle() | LVS_EX_AUTOSIZECOLUMNS );
+
+    // cx=客户区宽度
+    // 客户区宽度 + ::GetSystemMetrics(SM_CXVSCROLL) + 边缘宽度 = 窗口宽度
+
+    if( last_client_cx == cx )
+        return;
+
+    SetRedraw( FALSE );
+    {
+        int w_current[3] = { GetColumnWidth(0), GetColumnWidth(1), GetColumnWidth(2) };
+        int w_expect[3];
+        for( int i=0; i<3; ++i )
+        {
+            SetColumnWidth( i, LVSCW_AUTOSIZE );
+            int content_width = GetColumnWidth(i);
+
+            SetColumnWidth( i, LVSCW_AUTOSIZE_USEHEADER );
+            int header_width = i==2 ? GetColumnWidth(0) : GetColumnWidth(i); // 在 LVSCW_AUTOSIZE_USEHEADER 时最后一列返回剩余宽度
+
+            w_expect[i] = (std::max)(content_width, header_width);
+        }
+        //TRACE( "起始 %d, %d, %d\n", w_current[0], w_current[1], w_current[2] );
+
+        if( cx > last_client_cx ) // 放宽客户端
+        {
+            if( w_current[0]+w_current[1]+w_current[2] < cx ) // 需要扩宽列
+            {
+                int remainder = cx - last_client_cx;
+                for( int i=2; remainder!=0 && i!=-1; --i )
+                {
+                    int need = w_expect[i] - w_current[i];
+                    if( need > 0 )
+                    {
+                        int temp = (std::min)( need, remainder );
+                        w_current[i] += temp;
+                        remainder -= temp;
+                    }
+                }
+            }
+        }
+        else if( cx < last_client_cx ) // 缩窄客户端
+        {
+            if( w_current[0]+w_current[1]+w_current[2] > cx ) // 需要缩窄列
+            {
+                int remainder = last_client_cx - cx;
+                for( int i=2; remainder!=0 && i!=-1; --i )
+                {
+                    int need = w_current[i] - w_expect[i];
+                    if( need > 0 )
+                    {
+                        int temp = (std::min)( need, remainder );
+                        w_current[i] -= temp;
+                        remainder -= temp;
+                    }
+                }
+            }
+        }
+
+        //TRACE( "终了 %d, %d, %d\n", w_current[0], w_current[1], w_current[2] );
+        TRACE( "%d + %d + %d = %d; cx=%d\n", w_current[0], w_current[1], w_current[2], w_current[0]+w_current[1]+w_current[2], cx );
+        for( int i=0; i<3; ++i )
+            SetColumnWidth( i, w_current[i] );
+        last_client_cx = cx;
+    }
+    SetRedraw( TRUE );
 }
 
 void CPairListCtrl::OnLvnColumnclick( NMHDR* pNMHDR, LRESULT* pResult ) // 排序
@@ -515,8 +575,11 @@ void CPairListCtrl::OnNMRClick( NMHDR* pNMHDR, LRESULT* pResult ) // 右键单�
                 {
                     auto a = m_raw[std::get<0>(m_pair[nRow])];
                     auto b = m_raw[std::get<3>(m_pair[nRow])];
-                    CDupImgFinder2Dlg dlg( this, a, b );
+
+                    CDupImgFinder2Dlg dlg( GetParent(), a, b );
+               GetParent()->ShowWindow( SW_HIDE );
                     dlg.DoModal();
+               GetParent()->ShowWindow( SW_SHOW );
                     PathMaybeValidated_( a.first );
                     PathMaybeValidated_( b.first );
                     Invalidate();

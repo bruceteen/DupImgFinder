@@ -35,9 +35,7 @@ protected:
     DECLARE_MESSAGE_MAP()
 
 protected:
-    int min_window_cx, min_client_cx;
-    int last_window_cx;
-    const int min_header_width=10; int last_client_cx;
+    int last_client_cx;
 
 public:
     std::vector<std::wstring> m_folders;
